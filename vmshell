@@ -1,0 +1,8 @@
+#!/bin/bash
+
+qemu-system-x86_64 -kernel vmlinux -append "console=ttyS0 root=/dev/sda" -hda rootfs.img -nographic
+
+exit;
+while true; do
+  qemu-system-x86_64 -hda ./disk.raw -nographic
+done

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Web Terminal</title>
+    <link href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css" rel="stylesheet"/>
+    <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-attach/lib/xterm-addon-attach.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
+    <style>
+        #terminal-container {
+            width: 700px;
+            height: 500px;
+            padding: 10px;
+            background-color: black;
+            border: 2px solid #ccc;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div id="terminal-container"></div>
+    <script>
+        const terminal = new Terminal({
+            cursorBlink: true
+        });
+        const terminalContainer = document.getElementById('terminal-container');
+        terminal.open(terminalContainer);
+        const fitAddon = new FitAddon.FitAddon();
+        terminal.loadAddon(fitAddon);
+        terminal.options.fontSize = 12; 
+        // Initialize WebSocket connection to the server
+        const ws = new WebSocket('ws://localhost:38000/ws');
+        
+        ws.binaryType = 'arraybuffer'; // Set the binary type to ArrayBuffer for receiving binary messages
+        
+        function sendResizeToServer() {
+    if (ws.readyState === WebSocket.OPEN) {
+        fitAddon.fit(); // Fit the terminal to the size of the container
+        let { cols, rows } = terminal;
+        ws.send(JSON.stringify({ action: "resize", cols: cols, rows: rows }));
+    }
+}
+
+        // When the WebSocket connection is established
+        ws.addEventListener('open', () => {
+            terminal.write('Connected to server...\r\n');
+                sendResizeToServer(); // Send the size of the terminal to the server
+        });
+        
+        // Handle incoming binary messages (terminal output) from the WebSocket
+        ws.addEventListener('message', (event) => {
+            if (typeof event.data === 'string') {
+                terminal.write(event.data);
+            } else {
+                // We have received an ArrayBuffer
+                // Convert the ArrayBuffer to string
+                const decoder = new TextDecoder("utf-8");
+                const text = decoder.decode(new Uint8Array(event.data));
+                terminal.write(text);
+            }
+        });
+        
+        ws.addEventListener('close', () => {
+            terminal.write('\r\nDisconnected from server...');
+        });
+
+        ws.addEventListener('error', (error) => {
+            terminal.write('\r\nWebSocket error: ' + error.message);
+        });
+        
+        // Send data to the WebSocket when data is input into the terminal
+        terminal.onData(data => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(data);
+            }
+        });
+        
+        // Handle terminal resize
+        terminal.onResize(({cols, rows}) => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({action: "resize", cols: cols, rows: rows}));
+            }
+        });
+
+        // Focus the terminal on load
+        window.addEventListener('load', () => {
+    sendResizeToServer(); // Send initial size when the page loads
+    terminal.focus();
+});
+window.addEventListener('resize', () => {
+    sendResizeToServer(); // Send updated size when the window is resized
+});
+    </script>
+</body>
+</html>

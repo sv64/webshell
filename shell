@@ -1,0 +1,10 @@
+#!/bin/bash
+
+while true; do
+if `podman container exists webtty`; then
+  podman exec -it webtty /bin/bash
+else
+  podman run --security-opt label=type:container_t -h debian --name webtty debian:12 tail -f /dev/null
+  podman exec -it webtty /bin/bash
+fi
+done
